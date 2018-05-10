@@ -57,6 +57,7 @@ import org.springframework.transaction.support.TransactionCallbackWithoutResult;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -735,17 +736,26 @@ public class JdbcOperationsSessionRepository implements
 			if (attributeValue == null) {
 				this.delta.put(attributeName, DeltaValue.REMOVED);
 			}
-			else if (this.delegate.getAttribute(attributeName) != null) {
-				this.delta.put(attributeName, DeltaValue.UPDATED);
-			}
 			else {
-				this.delta.put(attributeName, DeltaValue.ADDED);
+				final Object existingAttributeValue = this.delegate.getAttribute(attributeName);
+				if (existingAttributeValue != null) {
+					if (existingAttributeValue.getClass() != attributeValue.getClass() || !isImmutable(existingAttributeValue.getClass()) || !attributeValue.equals(existingAttributeValue)) {
+						this.delta.put(attributeName, DeltaValue.UPDATED);
+					}
+				}
+				else {
+					this.delta.put(attributeName, DeltaValue.ADDED);
+				}
 			}
 			this.delegate.setAttribute(attributeName, attributeValue);
 			if (PRINCIPAL_NAME_INDEX_NAME.equals(attributeName) ||
 					SPRING_SECURITY_CONTEXT.equals(attributeName)) {
 				this.changed = true;
 			}
+		}
+
+		private boolean isImmutable(Class<?> clazz) {
+			return ClassUtils.isPrimitiveOrWrapper(clazz) || clazz == String.class || clazz == Class.class;
 		}
 
 		@Override
